@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
+using cosmos_repository_loggingtests.Monitoring.Tracing;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 
@@ -30,6 +31,9 @@ builder.Services.AddOpenTelemetry()
     })
     .WithTracing(t =>
     {
+        t.SetSampler(new ParentBasedElseAlwaysRecordSampler(new AlwaysOnSampler()))
+        .AddProcessor<TailSamplingProcessor>();
+
         t.AddAspNetCoreInstrumentation(o =>
         {
             o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health");
@@ -51,17 +55,31 @@ builder.Services.AddOpenTelemetry()
     otel.AddConsoleExporter();
 });
 
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok("healthy"));
-app.MapGet("/", (ILogger<Program> log) =>
+app.MapGet("/", async (ILogger<Program> log, IHttpClientFactory httpClientFactory) =>
 {
     log.LogInformation("Info will only be exported if this trace fails.");
+    var client = httpClientFactory.CreateClient();
+    var result = await client.GetAsync("https://jsonplaceholder.typicode.com/posts/1/comments");
+    var data = await result.Content.ReadAsStringAsync();
+
+    log.LogDebug("Fetched {Length} characters of data.", data.Length);
     return "Hello OTel!";
 });
-app.MapGet("/fail", (ILogger<Program> log) =>
+app.MapGet("/fail", async (ILogger<Program> log, IHttpClientFactory httpClientFactory) =>
 {
     log.LogInformation("Info will be exported because this request fails.");
+
+    var client = httpClientFactory.CreateClient();
+    var result = await client.GetAsync("https://jsonplaceholder.typicode.com/posts/1/comments");
+    var data = await result.Content.ReadAsStringAsync();
+
+    log.LogDebug("Fetched {Length} characters of data.", data.Length);
+
     throw new InvalidOperationException("Boom");
 });
 
