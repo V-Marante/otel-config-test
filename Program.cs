@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,7 +24,7 @@ builder.Logging.AddFilter((category, level) =>
 builder.Services.AddOpenTelemetry()
     .UseAzureMonitor(options =>
     {
-        // Set APPLICATIONINSIGHTS_CONNECTION_STRING in env or appsettings
+        options.ConnectionString = "InstrumentationKey=3021274a-44ee-484c-b730-07e34fbced1c;IngestionEndpoint=https://northeurope-2.in.applicationinsights.azure.com/;LiveEndpoint=https://northeurope.livediagnostics.monitor.azure.com/;ApplicationId=539a817e-0bf2-47c2-a4a7-a457956ee605";
         options.SamplingRatio = 1.0f;          // full tracing per your requirement (override rate-limited default)
         options.TracesPerSecond = null;        // ensure percentage-based sampler is used
     })
@@ -34,8 +35,21 @@ builder.Services.AddOpenTelemetry()
             o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health");
             o.RecordException = true;          // sets span status on failures
         });
+        
         t.AddHttpClientInstrumentation(o => o.RecordException = true);
+        
+        t.AddConsoleExporter();
     });
+
+    builder.Logging.AddOpenTelemetry(otel =>
+{
+    otel.IncludeFormattedMessage = true;
+    otel.IncludeScopes = true;
+    otel.ParseStateValues = true;
+
+    // Export logs to console (stdout)
+    otel.AddConsoleExporter();
+});
 
 var app = builder.Build();
 

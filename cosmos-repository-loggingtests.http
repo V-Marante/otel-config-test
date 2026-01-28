@@ -1,6 +1,14 @@
 @cosmos_repository_loggingtests_HostAddress = http://localhost:5000
 
-GET {{cosmos_repository_loggingtests_HostAddress}}/weatherforecast/
+GET {{cosmos_repository_loggingtests_HostAddress}}/health
 Accept: application/json
 
 ###
+
+GET {{cosmos_repository_loggingtests_HostAddress}}/
+Accept: application/json
+
+###
+
+GET {{cosmos_repository_loggingtests_HostAddress}}/fail
+Accept: application/json
